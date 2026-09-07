@@ -1,0 +1,16 @@
+{
+  "short_name": "LivestockHealth",
+  "name": "Livestock Health Monitoring & Escalation System",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "type": "image/svg+xml",
+      "sizes": "192x192 512x512"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#2a654b",
+  "theme_color": "#2a654b",
+  "display": "standalone",
+  "orientation": "portrait"
+}
