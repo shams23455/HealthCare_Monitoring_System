@@ -1,13 +1,106 @@
 /**
- * Client-side image compression and resizing for low-bandwidth rural mobile use.
- * Strips unnecessary bloat and resizes raw camera captures to efficient dimensions.
+ * Client-side image compression, resizing, and quality evaluation
+ * for low-bandwidth rural livestock observations.
  */
+
+export interface ImageQualityCheckResult {
+  quality: 'GOOD' | 'ACCEPTABLE' | 'POOR';
+  score: number; // 0 to 100
+  warning?: string;
+  details: string[];
+}
 
 export interface CompressedImageResult {
   blob: Blob;
   width: number;
   height: number;
   size: number;
+  qualityCheck: ImageQualityCheckResult;
+}
+
+export function evaluateClientImageQuality(
+  width: number,
+  height: number,
+  size: number,
+  canvasCtx?: CanvasRenderingContext2D | null
+): ImageQualityCheckResult {
+  const details: string[] = [];
+  let score = 85;
+
+  // 1. Resolution checks
+  if (width < 300 || height < 300) {
+    details.push('Resolution is very low (< 300px); physical clinical signs may be blurry.');
+    score -= 40;
+  } else if (width >= 800 && height >= 600) {
+    details.push('Resolution is high and suitable for veterinary inspection.');
+    score += 10;
+  }
+
+  // 2. File size checks
+  if (size < 8 * 1024) {
+    details.push('File size is very small (< 8 KB); severe compression artifacts likely.');
+    score -= 30;
+  }
+
+  // 3. Luminance / Lighting check using canvas pixel sample if available
+  if (canvasCtx && width > 0 && height > 0) {
+    try {
+      // Sample a small 50x50 region from center
+      const sampleX = Math.floor(width / 4);
+      const sampleY = Math.floor(height / 4);
+      const sampleW = Math.min(60, Math.floor(width / 2));
+      const sampleH = Math.min(60, Math.floor(height / 2));
+      const imgData = canvasCtx.getImageData(sampleX, sampleY, sampleW, sampleH);
+      const data = imgData.data;
+
+      let totalBrightness = 0;
+      const step = 4; // every pixel
+      const pixelCount = data.length / 4;
+
+      for (let i = 0; i < data.length; i += step) {
+        // perceived luminance formula
+        const lum = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+        totalBrightness += lum;
+      }
+
+      const avgLum = totalBrightness / pixelCount;
+      if (avgLum < 25) {
+        details.push('Image appears underexposed or captured in dark lighting.');
+        score -= 25;
+      } else if (avgLum > 240) {
+        details.push('Image appears overexposed or washed out by direct glare.');
+        score -= 20;
+      } else {
+        details.push('Lighting and exposure are acceptable for visual triage.');
+      }
+    } catch {
+      // Canvas read access might be restricted in cross-origin situations
+    }
+  }
+
+  // Determine classification
+  if (score < 50 || width < 300 || height < 300 || size < 8 * 1024) {
+    return {
+      quality: 'POOR',
+      score: Math.max(10, score),
+      warning: 'Photo quality may be too low for reliable review. Please capture another photo if possible.',
+      details
+    };
+  }
+
+  if (score >= 80 && width >= 800 && height >= 600) {
+    return {
+      quality: 'GOOD',
+      score: Math.min(100, score),
+      details
+    };
+  }
+
+  return {
+    quality: 'ACCEPTABLE',
+    score: Math.min(79, score),
+    details
+  };
 }
 
 export async function compressImage(
@@ -48,6 +141,9 @@ export async function compressImage(
 
         ctx.drawImage(img, 0, 0, width, height);
 
+        // Perform quality assessment on the drawn canvas
+        const qualityCheck = evaluateClientImageQuality(width, height, file.size, ctx);
+
         canvas.toBlob(
           (blob) => {
             if (!blob) {
@@ -58,7 +154,8 @@ export async function compressImage(
               blob,
               width,
               height,
-              size: blob.size
+              size: blob.size,
+              qualityCheck
             });
           },
           'image/jpeg',

@@ -34,7 +34,9 @@ import {
 import { Animal, Symptom, Observation, RiskLevel } from '@/types';
 import { formatShortDate } from '@/utils/formatters';
 import { enqueueObservation, cacheAnimals, getCachedAnimals } from '@/services/offline/offlineQueue';
-import { WifiOff, CloudOff } from 'lucide-react';
+import { evaluateClientImageQuality, ImageQualityCheckResult } from '@/services/offline/imageCompressor';
+import { ConfidenceExplanationCard } from '@/components/risk/ConfidenceExplanationCard';
+import { WifiOff, CloudOff, AlertTriangle, Eye, Sparkles } from 'lucide-react';
 
 interface SelectedSymptomState {
   symptom_id?: string;
@@ -105,6 +107,7 @@ export const ObservationCreatePage: React.FC = () => {
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [photoDimensions, setPhotoDimensions] = useState<{ width: number; height: number } | null>(null);
+  const [photoQuality, setPhotoQuality] = useState<ImageQualityCheckResult | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Submission State
@@ -264,10 +267,12 @@ export const ObservationCreatePage: React.FC = () => {
       const objectUrl = URL.createObjectURL(file);
       setPhotoPreview(objectUrl);
 
-      // Extract preview dimensions
+      // Extract preview dimensions and assess quality
       const img = new Image();
       img.onload = () => {
         setPhotoDimensions({ width: img.naturalWidth, height: img.naturalHeight });
+        const qualityResult = evaluateClientImageQuality(img.naturalWidth, img.naturalHeight, file.size);
+        setPhotoQuality(qualityResult);
       };
       img.src = objectUrl;
     }
@@ -280,6 +285,7 @@ export const ObservationCreatePage: React.FC = () => {
     }
     setPhotoPreview(null);
     setPhotoDimensions(null);
+    setPhotoQuality(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -457,27 +463,15 @@ export const ObservationCreatePage: React.FC = () => {
             </p>
           </div>
 
-          {/* Preliminary Risk Box */}
-          <div className="p-4 bg-white rounded-2xl border border-slate-200 text-left space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold uppercase text-slate-500">
-                Preliminary Offline Assessment
-              </span>
-              <RiskBadge level={prelimRisk} />
-            </div>
-
-            <p className="text-xs sm:text-sm font-semibold text-slate-800">
-              {prelimRisk === 'LOW' && 'Preliminary: No acute emergency signs identified locally.'}
-              {prelimRisk === 'MEDIUM' && 'Preliminary: Multiple or moderate symptoms detected. Monitor closely.'}
-              {prelimRisk === 'HIGH' && 'Preliminary: Severe symptoms or high fever detected. Recommended for expert review upon sync.'}
-              {prelimRisk === 'UNKNOWN' && 'Preliminary assessment pending.'}
-            </p>
-
-            <div className="pt-2 border-t border-slate-100 flex items-center gap-1.5 text-[11px] text-amber-700 font-medium">
-              <Info className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-              <span>Local preliminary assessment only. Cloud risk engine will evaluate upon synchronization. Not a confirmed disease diagnosis.</span>
-            </div>
-          </div>
+          {/* Confidence & Explainability Component */}
+          <ConfidenceExplanationCard
+            level={prelimRisk}
+            confidence={0.80}
+            condition={prelimRisk === 'HIGH' ? 'Acute Symptoms Detected Offline' : prelimRisk === 'MEDIUM' ? 'Moderate Clinical Signs' : 'Healthy Vitality'}
+            factors={Object.values(selectedSymptoms).map(s => `${s.symptom_name} (${s.severity}, ${s.duration})`)}
+            recommendedAction={prelimRisk === 'HIGH' ? 'Isolate the animal immediately. Observation will automatically escalate to veterinary expert when connected.' : 'Monitor animal vitality and ensure access to clean water.'}
+            isPreliminary={true}
+          />
 
           <div className="space-y-2.5 pt-2">
             <Button
@@ -539,27 +533,18 @@ export const ObservationCreatePage: React.FC = () => {
             </p>
           </div>
 
-          {/* Risk Assessment Box */}
-          <div className="p-4 bg-white rounded-2xl border border-slate-200 text-left space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold uppercase text-slate-500">
-                Health Risk Assessment
-              </span>
-              <RiskBadge level={risk} />
-            </div>
-
-            <p className="text-xs sm:text-sm font-semibold text-slate-800">
-              {risk === 'LOW' && 'Continue monitoring the animal. No critical symptoms detected.'}
-              {risk === 'MEDIUM' && 'Monitor the animal closely and record another observation if symptoms change.'}
-              {risk === 'HIGH' && 'Expert review is recommended. This does not confirm a disease, but an expert should review the case.'}
-              {risk === 'UNKNOWN' && 'More information is needed to determine health risk.'}
-            </p>
-
-            <div className="pt-2 border-t border-slate-100 flex items-center gap-1.5 text-[11px] text-slate-500 font-medium">
-              <Info className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-              <span>Routine rule-based health assessment — not a confirmed diagnosis.</span>
-            </div>
-          </div>
+          {/* Confidence & Explainability Component */}
+          <ConfidenceExplanationCard
+            level={risk}
+            confidence={submittedObservation.system_confidence || (submittedObservation.predictions?.[0]?.confidence_score ?? 0.85)}
+            condition={submittedObservation.predictions?.[0]?.predicted_condition}
+            factors={submittedObservation.explanation_factors && submittedObservation.explanation_factors.length > 0
+              ? submittedObservation.explanation_factors
+              : Object.values(selectedSymptoms).map(s => `${s.symptom_name} (${s.severity})`)}
+            explanation={submittedObservation.predictions?.[0]?.explanation}
+            recommendedAction={submittedObservation.recommended_action || (risk === 'HIGH' ? 'Case automatically escalated to veterinary expert for prompt clinical review.' : 'Continue daily herd monitoring.')}
+            isPreliminary={true}
+          />
 
           <div className="space-y-2.5 pt-2">
             <Button
@@ -1001,6 +986,20 @@ export const ObservationCreatePage: React.FC = () => {
               </p>
             </div>
 
+            {/* Image Capture Protocol Guidance */}
+            <div className="p-3.5 bg-farm-50/70 rounded-2xl border border-farm-200 text-xs text-farm-900 space-y-1.5 shadow-xs">
+              <span className="font-extrabold uppercase tracking-wide text-farm-800 flex items-center gap-1.5 text-[11px]">
+                <Sparkles className="w-3.5 h-3.5 text-farm-600" />
+                Image Capture Protocol Guidance
+              </span>
+              <ul className="grid grid-cols-1 sm:grid-cols-2 gap-1 text-[11px] font-semibold text-slate-700">
+                <li>• Keep the animal clearly visible.</li>
+                <li>• Use good lighting if possible.</li>
+                <li>• Keep the camera steady.</li>
+                <li>• Capture the affected area clearly.</li>
+              </ul>
+            </div>
+
             <div className="border-2 border-dashed border-slate-300 rounded-3xl p-6 text-center bg-slate-50 hover:bg-slate-100/70 transition-all relative">
               <input
                 ref={fileInputRef}
@@ -1018,10 +1017,47 @@ export const ObservationCreatePage: React.FC = () => {
                     alt="Animal preview"
                     className="max-h-60 mx-auto rounded-2xl shadow-lg border border-slate-200 object-contain"
                   />
-                  <div className="text-xs font-semibold text-slate-700 flex items-center justify-center gap-2">
+                  <div className="text-xs font-semibold text-slate-700 flex items-center justify-center gap-2 flex-wrap">
                     <span>{photoFile?.name}</span>
                     {photoDimensions && (
                       <span className="text-slate-400">({photoDimensions.width} × {photoDimensions.height}px)</span>
+                    )}
+
+                    {/* Image Quality Badge */}
+                    {photoQuality && (
+                      <span
+                        className={`px-2 py-0.5 rounded-full text-[11px] font-extrabold ${
+                          photoQuality.quality === 'GOOD'
+                            ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                            : photoQuality.quality === 'ACCEPTABLE'
+                            ? 'bg-blue-100 text-blue-800 border border-blue-300'
+                            : 'bg-amber-100 text-amber-900 border border-amber-300'
+                        }`}
+                      >
+                        Quality: {photoQuality.quality}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Quality Warning if POOR */}
+                  {photoQuality?.quality === 'POOR' && (
+                    <div className="p-3 bg-amber-50 border border-amber-300 rounded-xl text-left text-xs text-amber-900 space-y-1">
+                      <div className="flex items-center gap-1.5 font-bold text-amber-800">
+                        <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                        <span>Photo quality may be too low for reliable review. Please capture another photo if possible.</span>
+                      </div>
+                      {photoQuality.details.map((d, i) => (
+                        <p key={i} className="text-[11px] text-amber-700 pl-5">• {d}</p>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Offline status notification */}
+                  <div className="text-[11px] font-bold text-slate-600">
+                    {!navigator.onLine ? (
+                      <span className="text-amber-700">💾 Photo saved offline. Waiting for internet connection.</span>
+                    ) : (
+                      <span className="text-emerald-700">✓ Photo ready for secure upload.</span>
                     )}
                   </div>
 
@@ -1034,7 +1070,7 @@ export const ObservationCreatePage: React.FC = () => {
                       className="text-red-700 hover:text-red-800 font-bold flex items-center gap-1.5"
                     >
                       <Trash2 className="w-4 h-4" />
-                      <span>Remove Photo</span>
+                      <span>Remove & Retake Photo</span>
                     </Button>
                   </div>
                 </div>

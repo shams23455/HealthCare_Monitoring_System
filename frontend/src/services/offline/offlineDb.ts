@@ -10,6 +10,7 @@ export interface LocalObservation {
   server_id?: string;
   animal_id: string;
   animal_tag?: string;
+  animal_species?: string;
   first_symptom_at: string;
   observed_at: string;
   symptoms_description: string[];
@@ -22,8 +23,11 @@ export interface LocalObservation {
   animal_location?: string;
   age_stage?: string;
   notes?: string;
-  sync_status: 'PENDING' | 'SYNCING' | 'SYNCED' | 'FAILED';
+  sync_status: 'PENDING' | 'SYNCING' | 'SYNCED' | 'FAILED' | 'RETRYING';
   preliminary_risk?: 'LOW' | 'MEDIUM' | 'HIGH' | 'UNKNOWN';
+  system_confidence?: number;
+  explanation_factors?: string[];
+  recommended_action?: string;
   created_at: string;
   last_sync_attempt?: string;
   sync_error?: string;
@@ -39,7 +43,9 @@ export interface LocalImage {
   file_size: number;
   width?: number;
   height?: number;
-  sync_status: 'PENDING' | 'SYNCING' | 'SYNCED' | 'FAILED';
+  image_quality?: 'GOOD' | 'ACCEPTABLE' | 'POOR';
+  quality_notes?: string;
+  sync_status: 'PENDING' | 'SYNCING' | 'SYNCED' | 'FAILED' | 'RETRYING';
   created_at: string;
 }
 
@@ -48,7 +54,7 @@ export interface SyncQueueItem {
   operation_type: 'CREATE_OBSERVATION' | 'UPLOAD_IMAGE';
   local_entity_id: string; // references LocalObservation.local_id or LocalImage.id
   parent_local_id?: string; // for images: references parent observation local_id
-  status: 'PENDING' | 'SYNCING' | 'SYNCED' | 'FAILED';
+  status: 'PENDING' | 'SYNCING' | 'SYNCED' | 'FAILED' | 'RETRYING';
   retry_count: number;
   last_attempt_at?: string;
   error_message?: string;
@@ -66,6 +72,19 @@ export class LivestockOfflineDatabase extends Dexie {
   observationImages!: Table<LocalImage, string>;
   syncQueue!: Table<SyncQueueItem, number>;
   appMetadata!: Table<AppMetadata, string>;
+
+  // Clean convenience getters matching requested store names
+  get images(): Table<LocalImage, string> {
+    return this.observationImages;
+  }
+
+  get sync_queue(): Table<SyncQueueItem, number> {
+    return this.syncQueue;
+  }
+
+  get sync_metadata(): Table<AppMetadata, string> {
+    return this.appMetadata;
+  }
 
   constructor() {
     super('LivestockHealthOfflineDB_v2');

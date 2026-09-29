@@ -17,6 +17,8 @@ class Image(Base):
     image_type = Column(String(50), default="BODY")
     captured_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     upload_status = Column(String(50), default="PENDING")  # PENDING, UPLOADING, UPLOADED, FAILED
+    image_quality = Column(String(50), default="GOOD", nullable=True)  # GOOD, ACCEPTABLE, POOR
+    quality_notes = Column(String(255), nullable=True)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
     observation = relationship("Observation", back_populates="images")

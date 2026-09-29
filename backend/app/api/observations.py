@@ -3,8 +3,8 @@ from uuid import UUID
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, status
 from sqlalchemy.orm import Session
-from app.api.deps import get_db, get_current_user, get_current_farmer
-from app.core.risk import evaluate_disease_risk
+from app.api.deps import get_db, get_current_user, get_current_farmer, get_current_expert
+from app.core.risk import evaluate_disease_risk, default_risk_engine
 from app.core.audit import log_audit
 from app.models.animal import Animal
 from app.models.observation import Observation
@@ -66,13 +66,20 @@ def create_observation(
             if s.symptom_name and s.symptom_name not in symptoms_list:
                 symptoms_list.append(s.symptom_name)
 
-    # 3. Evaluate risk using Phase 1 rule engine
-    risk_level, condition, confidence, explanation = evaluate_disease_risk(
+    # 3. Evaluate risk using pluggable RuleBasedRiskEngine
+    risk_assessment = default_risk_engine.assess(
         symptoms=symptoms_list,
         temperature=obs_in.temperature,
         appetite_status=obs_in.appetite_status,
-        activity_status=obs_in.activity_status
+        activity_status=obs_in.activity_status,
+        age_stage=obs_in.age_stage or animal.age_stage
     )
+    risk_level = risk_assessment.risk_level
+    condition = risk_assessment.predicted_condition
+    confidence = risk_assessment.confidence
+    explanation = risk_assessment.explanation
+    factors = risk_assessment.factors
+    recommended_action = risk_assessment.recommended_action
 
     # 4. Handle timestamps
     now = datetime.now(timezone.utc)
@@ -91,6 +98,7 @@ def create_observation(
         first_symptom_at=first_symptom_at,
         observed_at=observed_at,
         observation_date=observation_date,
+        submitted_at=now,
         symptoms_description=symptoms_list,
         temperature=obs_in.temperature,
         temperature_unit=obs_in.temperature_unit or "C",
@@ -100,7 +108,10 @@ def create_observation(
         animal_location=obs_in.animal_location,
         age_stage=age_stage,
         notes=obs_in.notes,
-        risk_level=risk_level
+        risk_level=risk_level,
+        system_confidence=confidence,
+        explanation_factors=factors,
+        recommended_action=recommended_action
     )
     db.add(observation)
     db.flush()
@@ -137,7 +148,9 @@ def create_observation(
         )
         review = ExpertReview(
             observation_id=observation.id,
-            validation_status="PENDING"
+            validation_status="PENDING",
+            system_risk_level=risk_level,
+            system_confidence=f"{int(confidence * 100)}%"
         )
         db.add(escalation)
         db.add(review)
@@ -223,7 +236,9 @@ async def upload_observation_image(
         width=saved_meta["width"],
         height=saved_meta["height"],
         image_type=image_type,
-        upload_status=saved_meta["upload_status"]
+        upload_status=saved_meta["upload_status"],
+        image_quality=saved_meta.get("image_quality", "GOOD"),
+        quality_notes=saved_meta.get("quality_notes")
     )
     db.add(img_record)
     db.commit()
@@ -307,3 +322,22 @@ def delete_observation_image(
         pass
 
     return {"message": "Image deleted successfully"}
+
+@router.post("/{observation_id}/start-review", response_model=ObservationResponse)
+def start_expert_review(
+    observation_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_expert)
+):
+    obs = db.query(Observation).filter(Observation.id == observation_id).first()
+    if not obs:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Observation record not found"
+        )
+    if not obs.expert_review_started_at:
+        obs.expert_review_started_at = datetime.now(timezone.utc)
+        db.commit()
+        db.refresh(obs)
+
+    return obs

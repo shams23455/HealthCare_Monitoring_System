@@ -7,12 +7,34 @@ class SyncService {
   private listeners: (() => void)[] = [];
 
   constructor() {
-    // Listen for network coming back online
+    // Listen for network coming back online (safe fallback)
     if (typeof window !== 'undefined') {
       window.addEventListener('online', () => {
         console.log('[SyncService] Network returned. Triggering automatic background sync.');
         this.syncAll();
       });
+
+      // Listen for Background Sync trigger from Service Worker
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.addEventListener('message', (event) => {
+          if (event.data?.type === 'TRIGGER_SYNC') {
+            console.log('[SyncService] Service Worker requested sync queue processing.');
+            this.syncAll();
+          }
+        });
+      }
+    }
+  }
+
+  public requestBackgroundSync() {
+    if (typeof window !== 'undefined' && 'serviceWorker' in navigator && 'SyncManager' in window) {
+      navigator.serviceWorker.ready
+        .then((reg: any) => {
+          if (reg?.sync) {
+            reg.sync.register('livestock-sync-queue').catch(() => {});
+          }
+        })
+        .catch(() => {});
     }
   }
 
@@ -129,7 +151,7 @@ class SyncService {
         } catch (err: any) {
           console.error(`[SyncService] Failed to sync observation ${localObs.local_id}:`, err);
           const nextRetry = (item.retry_count || 0) + 1;
-          const status = nextRetry >= 3 ? 'FAILED' : 'PENDING';
+          const status: 'FAILED' | 'RETRYING' = nextRetry >= 3 ? 'FAILED' : 'RETRYING';
           if (status === 'FAILED') failedCount++;
 
           if (item.id) {
@@ -197,7 +219,7 @@ class SyncService {
         } catch (err: any) {
           console.error(`[SyncService] Failed to upload image ${localImg.id}:`, err);
           const nextRetry = (item.retry_count || 0) + 1;
-          const status = nextRetry >= 3 ? 'FAILED' : 'PENDING';
+          const status: 'FAILED' | 'RETRYING' = nextRetry >= 3 ? 'FAILED' : 'RETRYING';
           if (status === 'FAILED') failedCount++;
 
           if (item.id) {

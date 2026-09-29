@@ -27,6 +27,12 @@ class Observation(Base):
     age_stage = Column(String(50), nullable=True)
     notes = Column(Text, nullable=True)
     risk_level = Column(String(20), nullable=False, default="UNKNOWN", index=True)
+    system_confidence = Column(Numeric(4, 2), nullable=True)
+    explanation_factors = Column(JSON, default=list, nullable=True)
+    recommended_action = Column(String(255), nullable=True)
+    submitted_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=True)
+    expert_review_started_at = Column(DateTime(timezone=True), nullable=True)
+    expert_review_completed_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
     animal = relationship("Animal", back_populates="observations")

@@ -13,6 +13,8 @@ class ImageBase(BaseModel):
     height: Optional[int] = None
     image_type: Optional[str] = "BODY"
     upload_status: Optional[str] = "UPLOADED"
+    image_quality: Optional[str] = "GOOD"
+    quality_notes: Optional[str] = None
 
 class ImageResponse(ImageBase):
     id: UUID
@@ -40,7 +42,13 @@ class ReviewResponse(BaseModel):
     expert_id: Optional[UUID] = None
     diagnosis: Optional[str] = None
     validation_status: str
+    expert_decision: Optional[str] = "VALIDATED"
+    system_risk_level: Optional[str] = None
+    system_confidence: Optional[str] = None
+    modified_risk_level: Optional[str] = None
     comments: Optional[str] = None
+    expert_notes: Optional[str] = None
+    error_category: Optional[str] = None
     reviewed_at: Optional[datetime] = None
 
     class Config:
@@ -112,6 +120,12 @@ class ObservationResponse(ObservationBase):
     observation_date: datetime
     observed_at: datetime
     risk_level: str
+    system_confidence: Optional[float] = None
+    explanation_factors: Optional[List[str]] = []
+    recommended_action: Optional[str] = None
+    submitted_at: Optional[datetime] = None
+    expert_review_started_at: Optional[datetime] = None
+    expert_review_completed_at: Optional[datetime] = None
     created_at: datetime
     animal: Optional[AnimalResponse] = None
     observation_symptoms: List[ObservationSymptomResponse] = []

@@ -62,3 +62,16 @@ self.addEventListener('fetch', (event) => {
     })
   );
 });
+
+// Background Sync listener for supported browsers
+self.addEventListener('sync', (event) => {
+  if (event.tag === 'livestock-sync-queue') {
+    event.waitUntil(
+      self.clients.matchAll({ includeUncontrolled: true, type: 'window' }).then((clients) => {
+        clients.forEach((client) => {
+          client.postMessage({ type: 'TRIGGER_SYNC' });
+        });
+      })
+    );
+  }
+});

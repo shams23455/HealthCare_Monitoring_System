@@ -6,7 +6,10 @@ import {
   Symptom,
   Observation,
   ObservationCreateInput,
-  ImageRecord
+  ImageRecord,
+  MetricsDashboardData,
+  ReviewTimeMetrics,
+  ErrorAnalysisMetrics
 } from '@/types';
 
 const API_BASE_URL = '/api';
@@ -256,4 +259,26 @@ export async function deleteObservationImage(observationId: string, imageId: str
     const errorData = await response.json().catch(() => ({ detail: 'Failed to delete image' }));
     throw new ApiError(errorData.detail || 'Delete failed', response.status);
   }
+}
+
+// ==========================================
+// Metrics & Expert Workflow Endpoints
+// ==========================================
+
+export async function startExpertReview(observationId: string): Promise<Observation> {
+  return apiFetch<Observation>(`/observations/${observationId}/start-review`, {
+    method: 'POST'
+  });
+}
+
+export async function getReviewTimeMetrics(): Promise<ReviewTimeMetrics> {
+  return apiFetch<ReviewTimeMetrics>('/metrics/review-time');
+}
+
+export async function getErrorAnalysisMetrics(): Promise<ErrorAnalysisMetrics> {
+  return apiFetch<ErrorAnalysisMetrics>('/metrics/error-analysis');
+}
+
+export async function getMetricsDashboard(): Promise<MetricsDashboardData> {
+  return apiFetch<MetricsDashboardData>('/metrics/dashboard');
 }

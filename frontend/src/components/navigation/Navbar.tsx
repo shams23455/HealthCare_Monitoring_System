@@ -1,20 +1,23 @@
 import React from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { HeartPulse, LogOut, User as UserIcon, Shield } from 'lucide-react';
-import { User } from '@/types';
+import { Link } from 'react-router-dom';
+import { HeartPulse, Stethoscope, Tractor, ShieldCheck } from 'lucide-react';
+import { User, Role } from '@/types';
+import { ConnectivityIndicator } from '@/components/common/ConnectivityIndicator';
 
 interface NavbarProps {
   user: User | null;
-  onLogout: () => void;
+  onLogout?: () => void;
+  onSwitchRole: (role: Role) => void;
 }
 
-export const Navbar: React.FC<NavbarProps> = ({ user, onLogout }) => {
-  const navigate = useNavigate();
+export const Navbar: React.FC<NavbarProps> = ({ user, onSwitchRole }) => {
+  const currentRole: Role = user?.role || 'FARMER';
 
   return (
     <header className="sticky top-0 z-40 bg-farm-900 text-white shadow-md">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-        <Link to="/" className="flex items-center gap-2.5 group">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
+        {/* Logo and Brand */}
+        <Link to="/" className="flex items-center gap-2.5 group shrink-0">
           <div className="w-10 h-10 rounded-xl bg-farm-600 flex items-center justify-center text-white shadow-sm group-hover:bg-farm-500 transition-colors">
             <HeartPulse className="w-6 h-6" />
           </div>
@@ -28,40 +31,61 @@ export const Navbar: React.FC<NavbarProps> = ({ user, onLogout }) => {
           </div>
         </Link>
 
-        {user ? (
-          <div className="flex items-center gap-3">
-            <div className="hidden sm:flex items-center gap-2 bg-farm-800/80 px-3 py-1.5 rounded-full border border-farm-700">
-              <Shield className="w-4 h-4 text-farm-300" />
-              <span className="text-xs font-bold text-farm-100">{user.name}</span>
-              <span className="text-[10px] uppercase font-extrabold px-2 py-0.5 rounded-md bg-farm-600 text-white">
-                {user.role}
-              </span>
-            </div>
+        {/* Center: Quick Role Switcher (No login required) */}
+        <div className="flex items-center bg-farm-950/80 p-1 rounded-xl border border-farm-800 shadow-inner">
+          <button
+            type="button"
+            onClick={() => onSwitchRole('FARMER')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+              currentRole === 'FARMER'
+                ? 'bg-emerald-600 text-white shadow-sm ring-1 ring-emerald-400'
+                : 'text-farm-200 hover:text-white hover:bg-farm-800/60'
+            }`}
+            title="Switch to Farmer View"
+          >
+            <Tractor className="w-3.5 h-3.5" />
+            <span>Farmer View</span>
+          </button>
 
-            <button
-              onClick={onLogout}
-              className="p-2 rounded-xl text-farm-200 hover:text-white hover:bg-farm-800 transition-colors"
-              title="Sign Out"
-            >
-              <LogOut className="w-5 h-5" />
-            </button>
-          </div>
-        ) : (
-          <div className="flex items-center gap-2">
-            <Link
-              to="/login"
-              className="px-4 py-2 text-sm font-semibold text-white hover:text-farm-200 transition-colors"
-            >
-              Log In
-            </Link>
-            <Link
-              to="/register"
-              className="px-4 py-2 text-sm font-bold bg-farm-600 hover:bg-farm-500 text-white rounded-xl shadow-sm transition-colors"
-            >
-              Register
-            </Link>
-          </div>
-        )}
+          <button
+            type="button"
+            onClick={() => onSwitchRole('EXPERT')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+              currentRole === 'EXPERT'
+                ? 'bg-amber-600 text-white shadow-sm ring-1 ring-amber-400'
+                : 'text-farm-200 hover:text-white hover:bg-farm-800/60'
+            }`}
+            title="Switch to Expert / Veterinarian View"
+          >
+            <Stethoscope className="w-3.5 h-3.5" />
+            <span>Expert View</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => onSwitchRole('ADMIN')}
+            className={`hidden md:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
+              currentRole === 'ADMIN'
+                ? 'bg-purple-600 text-white shadow-sm ring-1 ring-purple-400'
+                : 'text-farm-300 hover:text-white hover:bg-farm-800/60'
+            }`}
+            title="Switch to Admin View"
+          >
+            <ShieldCheck className="w-3.5 h-3.5" />
+            <span>Admin</span>
+          </button>
+        </div>
+
+        {/* Right side: Connectivity indicator & active user details */}
+        <div className="flex items-center gap-3 shrink-0">
+          <ConnectivityIndicator compact={true} />
+
+          {user && (
+            <div className="hidden lg:flex items-center gap-2 bg-farm-800/80 px-3 py-1.5 rounded-xl border border-farm-700 text-xs">
+              <span className="font-bold text-farm-100 truncate max-w-[140px]">{user.name}</span>
+            </div>
+          )}
+        </div>
       </div>
     </header>
   );

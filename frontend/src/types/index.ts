@@ -67,6 +67,22 @@ export interface ObservationSymptom {
   created_at?: string;
 }
 
+export type SyncStatus = 'PENDING' | 'SYNCING' | 'SYNCED' | 'FAILED' | 'RETRYING';
+
+export type ExpertDecision = 'VALIDATED' | 'MODIFIED' | 'REQUIRES_MORE_INFORMATION' | 'NOT_ACTIONABLE';
+
+export type ErrorCategory =
+  | 'IMAGE_QUALITY'
+  | 'SYMPTOM_MISSING'
+  | 'SYMPTOM_AMBIGUITY'
+  | 'LOCATION_MISSING'
+  | 'STAGE_MISSING'
+  | 'RISK_OVER_ESTIMATION'
+  | 'RISK_UNDER_ESTIMATION'
+  | 'SYNC_FAILURE'
+  | 'EXPERT_MODIFICATION'
+  | 'OTHER';
+
 export interface ImageRecord {
   id: string;
   observation_id: string;
@@ -77,6 +93,8 @@ export interface ImageRecord {
   height?: number;
   image_type: string;
   upload_status: 'PENDING' | 'UPLOADING' | 'UPLOADED' | 'FAILED';
+  image_quality?: 'GOOD' | 'ACCEPTABLE' | 'POOR';
+  quality_notes?: string;
   captured_at: string;
 }
 
@@ -95,8 +113,14 @@ export interface ExpertReview {
   observation_id: string;
   expert_id?: string;
   diagnosis?: string;
-  validation_status: 'PENDING' | 'VALIDATED' | 'REJECTED' | 'INCONCLUSIVE';
+  validation_status: 'PENDING' | 'VALIDATED' | 'REJECTED' | 'INCONCLUSIVE' | string;
+  expert_decision?: ExpertDecision;
+  system_risk_level?: string;
+  system_confidence?: string;
+  modified_risk_level?: string;
   comments?: string;
+  expert_notes?: string;
+  error_category?: ErrorCategory;
   reviewed_at?: string;
 }
 
@@ -118,6 +142,9 @@ export interface Observation {
   first_symptom_at: string;
   observation_date: string;
   observed_at: string;
+  submitted_at?: string;
+  expert_review_started_at?: string;
+  expert_review_completed_at?: string;
   symptoms_description: string[];
   temperature?: number;
   temperature_unit?: string;
@@ -128,6 +155,9 @@ export interface Observation {
   age_stage?: string;
   notes?: string;
   risk_level: RiskLevel;
+  system_confidence?: number;
+  explanation_factors?: string[];
+  recommended_action?: string;
   created_at: string;
   animal?: Animal;
   observation_symptoms?: ObservationSymptom[];
@@ -135,7 +165,7 @@ export interface Observation {
   predictions?: DiseasePrediction[];
   reviews?: ExpertReview[];
   escalations?: Escalation[];
-  sync_status?: 'SYNCED' | 'PENDING' | 'SYNCING' | 'FAILED';
+  sync_status?: SyncStatus;
   preliminary_risk?: RiskLevel;
 }
 
@@ -160,4 +190,61 @@ export interface ObservationCreateInput {
   animal_location?: string;
   age_stage?: string;
   notes?: string;
+}
+
+export interface ReviewTimeMetrics {
+  metric_name: string;
+  formula: string;
+  baseline_value: string;
+  target_value: string;
+  measured_value_hours: number | null;
+  average_turnaround_hours: number | null;
+  sample_size: number;
+  measurement_period: string;
+  unit: string;
+  note: string;
+}
+
+export interface ErrorAnalysisMetrics {
+  total_expert_reviews: number;
+  system_expert_agreement_count: number;
+  system_expert_disagreement_count: number;
+  disagreement_rate_percent: number;
+  expert_modifications_count: number;
+  requires_more_info_count: number;
+  category_breakdown: Record<string, number>;
+  evaluation_disclaimer: string;
+}
+
+export interface MetricsDashboardData {
+  total_observations: number;
+  high_risk_observations: number;
+  pending_reviews: number;
+  completed_reviews: number;
+  escalated_cases: number;
+  average_review_time_hours: number | null;
+  expert_modifications: number;
+  observations_requiring_more_information: number;
+  duplicate_preventions_count: number;
+  image_quality_stats: {
+    good: number;
+    acceptable: number;
+    poor: number;
+  };
+  experiment_framework: {
+    baseline: {
+      name: string;
+      time_to_review: string;
+      completion_rate: string;
+    };
+    target: {
+      name: string;
+      time_to_review: string;
+      completion_rate: string;
+    };
+    measured: {
+      time_to_review: string;
+      sample_size: number;
+    };
+  };
 }

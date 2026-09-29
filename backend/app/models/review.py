@@ -12,7 +12,13 @@ class ExpertReview(Base):
     expert_id = Column(Uuid, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
     diagnosis = Column(String(255), nullable=True)
     validation_status = Column(String(50), nullable=False, default="PENDING", index=True)
+    expert_decision = Column(String(50), nullable=True, default="VALIDATED", index=True)
+    system_risk_level = Column(String(50), nullable=True)
+    system_confidence = Column(String(20), nullable=True)
+    modified_risk_level = Column(String(50), nullable=True)
     comments = Column(Text, nullable=True)
+    expert_notes = Column(Text, nullable=True)
+    error_category = Column(String(50), nullable=True, index=True)
     reviewed_at = Column(DateTime(timezone=True), nullable=True)
 
     observation = relationship("Observation", back_populates="reviews")
