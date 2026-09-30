@@ -23,6 +23,12 @@ class Settings(BaseSettings):
         "http://localhost:3000",
     ]
 
+    # Risk Model Configuration
+    MODEL_TYPE: str = os.getenv("MODEL_TYPE", "hybrid")  # rule_based, ml, hybrid
+    MIN_CONFIDENCE: float = float(os.getenv("MIN_CONFIDENCE", "0.60"))
+    DATASET_PATH: str = os.getenv("DATASET_PATH", "data")
+    RESULTS_PATH: str = os.getenv("RESULTS_PATH", "results")
+
     class Config:
         case_sensitive = True
         env_file = ".env"

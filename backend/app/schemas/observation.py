@@ -48,6 +48,7 @@ class ReviewResponse(BaseModel):
     modified_risk_level: Optional[str] = None
     comments: Optional[str] = None
     expert_notes: Optional[str] = None
+    comparison_category: Optional[str] = "AGREEMENT"
     error_category: Optional[str] = None
     reviewed_at: Optional[datetime] = None
 

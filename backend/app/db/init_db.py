@@ -25,11 +25,21 @@ def create_database_if_not_exists():
     except Exception as e:
         logger.warning(f"Could not auto-create database (may already exist or permission restricted): {e}")
 
+def run_migrations():
+    """Ensure all required columns exist across database schema iterations."""
+    with engine.begin() as conn:
+        try:
+            conn.execute(text("ALTER TABLE expert_reviews ADD COLUMN comparison_category VARCHAR(50) DEFAULT 'AGREEMENT'"))
+            logger.info("Applied migration: added comparison_category to expert_reviews.")
+        except Exception:
+            pass  # Already exists or not applicable
+
 def init_db():
     create_database_if_not_exists()
     
     logger.info("Creating database tables if not present...")
     Base.metadata.create_all(bind=engine)
+    run_migrations()
     
     db = SessionLocal()
     try:

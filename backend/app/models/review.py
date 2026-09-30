@@ -18,6 +18,7 @@ class ExpertReview(Base):
     modified_risk_level = Column(String(50), nullable=True)
     comments = Column(Text, nullable=True)
     expert_notes = Column(Text, nullable=True)
+    comparison_category = Column(String(50), nullable=True, default="AGREEMENT", index=True)
     error_category = Column(String(50), nullable=True, index=True)
     reviewed_at = Column(DateTime(timezone=True), nullable=True)
 

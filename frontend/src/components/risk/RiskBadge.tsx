@@ -35,6 +35,13 @@ export const RiskBadge: React.FC<RiskBadgeProps> = ({
           {showText && <span>LOW - Continue monitoring</span>}
         </span>
       );
+    case 'REVIEW_REQUIRED':
+      return (
+        <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-purple-100 text-purple-900 border border-purple-300 ${className}`}>
+          <AlertCircle className="w-4 h-4 text-purple-600 shrink-0" aria-hidden="true" />
+          {showText && <span>REVIEW REQUIRED - Low confidence safety intercept</span>}
+        </span>
+      );
     case 'UNKNOWN':
     default:
       return (

@@ -11,6 +11,7 @@ class ReviewCreate(BaseModel):
     comments: Optional[str] = None
     expert_notes: Optional[str] = None
     modified_risk_level: Optional[str] = None
+    comparison_category: Optional[str] = None
     error_category: Optional[str] = None
 
 class EscalationUpdate(BaseModel):

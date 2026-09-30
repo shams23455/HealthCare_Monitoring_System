@@ -56,6 +56,20 @@ def submit_expert_review(
 
     system_conf_str = f"{int(obs.system_confidence * 100)}%" if obs.system_confidence is not None else "80%"
 
+    # Compute comparison category strictly per Part 10 specification
+    if review_in.comparison_category:
+        comparison_cat = review_in.comparison_category
+    elif obs.system_confidence is not None and float(obs.system_confidence) < 0.60:
+        comparison_cat = "LOW_CONFIDENCE"
+    elif decision == "REQUIRES_MORE_INFORMATION":
+        comparison_cat = "INSUFFICIENT_INFORMATION"
+    elif review_in.error_category in ["IMAGE_QUALITY", "IMAGE_QUALITY_ISSUE"]:
+        comparison_cat = "IMAGE_QUALITY_ISSUE"
+    elif decision == "MODIFIED" or (review_in.modified_risk_level and review_in.modified_risk_level != original_system_risk):
+        comparison_cat = "EXPERT_MODIFIED"
+    else:
+        comparison_cat = "AGREEMENT"
+
     if not review:
         review = ExpertReview(
             observation_id=review_in.observation_id,
@@ -68,6 +82,7 @@ def submit_expert_review(
             modified_risk_level=review_in.modified_risk_level,
             comments=notes,
             expert_notes=notes,
+            comparison_category=comparison_cat,
             error_category=review_in.error_category,
             reviewed_at=now
         )
@@ -82,6 +97,7 @@ def submit_expert_review(
         review.modified_risk_level = review_in.modified_risk_level
         review.comments = notes
         review.expert_notes = notes
+        review.comparison_category = comparison_cat
         review.error_category = review_in.error_category
         review.reviewed_at = now
 

@@ -7,6 +7,7 @@ from app.models.review import ExpertReview
 from app.models.escalation import Escalation
 from app.models.audit import AuditLog
 from app.models.symptom import Symptom, ObservationSymptom
+from app.models.experiment import ExperimentMeasurement, StakeholderFeedback
 
 __all__ = [
     "User",
@@ -18,5 +19,7 @@ __all__ = [
     "Escalation",
     "AuditLog",
     "Symptom",
-    "ObservationSymptom"
+    "ObservationSymptom",
+    "ExperimentMeasurement",
+    "StakeholderFeedback"
 ]

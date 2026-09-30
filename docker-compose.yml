@@ -1,0 +1,62 @@
+version: '3.8'
+
+services:
+  database:
+    image: postgres:15-alpine
+    container_name: livestock_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-livestock_db}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./database/schema.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-livestock_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: livestock_backend
+    restart: unless-stopped
+    depends_on:
+      database:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@database:5432/${POSTGRES_DB:-livestock_db}
+      SECRET_KEY: ${SECRET_KEY:-livestock_production_secret_key_2026}
+      ENVIRONMENT: ${ENVIRONMENT:-production}
+      MODEL_TYPE: ${MODEL_TYPE:-hybrid}
+      MIN_CONFIDENCE: ${MIN_CONFIDENCE:-0.60}
+      DATASET_PATH: /app/data
+      RESULTS_PATH: /app/results
+    ports:
+      - "8000:8000"
+    volumes:
+      - backend_uploads:/app/uploads
+      - ./data:/app/data:ro
+      - ./results:/app/results
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: livestock_frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "3000:80"
+
+volumes:
+  pgdata:
+    driver: local
+  backend_uploads:
+    driver: local

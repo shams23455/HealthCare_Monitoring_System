@@ -145,14 +145,23 @@ CREATE TABLE expert_reviews (
     observation_id UUID NOT NULL REFERENCES observations(id) ON DELETE CASCADE,
     expert_id UUID REFERENCES users(id) ON DELETE SET NULL,
     diagnosis VARCHAR(255),
-    validation_status VARCHAR(50) NOT NULL DEFAULT 'PENDING' CHECK (validation_status IN ('PENDING', 'VALIDATED', 'REJECTED', 'INCONCLUSIVE')),
+    validation_status VARCHAR(50) NOT NULL DEFAULT 'PENDING' CHECK (validation_status IN ('PENDING', 'VALIDATED', 'REJECTED', 'INCONCLUSIVE', 'MODIFIED', 'REQUIRES_MORE_INFORMATION', 'NOT_ACTIONABLE')),
+    expert_decision VARCHAR(50) DEFAULT 'VALIDATED',
+    system_risk_level VARCHAR(50),
+    system_confidence VARCHAR(20),
+    modified_risk_level VARCHAR(50),
     comments TEXT,
+    expert_notes TEXT,
+    comparison_category VARCHAR(50) DEFAULT 'AGREEMENT',
+    error_category VARCHAR(50),
     reviewed_at TIMESTAMPTZ
 );
 
 CREATE INDEX idx_reviews_observation ON expert_reviews(observation_id);
 CREATE INDEX idx_reviews_expert ON expert_reviews(expert_id);
 CREATE INDEX idx_reviews_status ON expert_reviews(validation_status);
+CREATE INDEX idx_reviews_comparison ON expert_reviews(comparison_category);
+CREATE INDEX idx_reviews_error_cat ON expert_reviews(error_category);
 
 -- ESCALATIONS TABLE
 CREATE TABLE escalations (
@@ -182,3 +191,36 @@ CREATE TABLE audit_logs (
 
 CREATE INDEX idx_audit_user ON audit_logs(user_id);
 CREATE INDEX idx_audit_entity ON audit_logs(entity_type, entity_id);
+
+-- EXPERIMENT_MEASUREMENTS TABLE
+CREATE TABLE experiment_measurements (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    trial_type VARCHAR(50) NOT NULL CHECK (trial_type IN ('BASELINE', 'PROPOSED')),
+    case_id VARCHAR(100),
+    species VARCHAR(100),
+    first_symptom_at TIMESTAMPTZ,
+    expert_review_at TIMESTAMPTZ,
+    time_to_review_hours NUMERIC(6,2) NOT NULL,
+    notes TEXT,
+    source VARCHAR(50) DEFAULT 'FIELD_MEASUREMENT' NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_experiment_trial_type ON experiment_measurements(trial_type);
+
+-- STAKEHOLDER_FEEDBACKS TABLE
+CREATE TABLE stakeholder_feedbacks (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    participant_type VARCHAR(50) NOT NULL CHECK (participant_type IN ('FARMER', 'FARM_STAFF', 'EXPERT')),
+    ease_observation_capture INTEGER NOT NULL CHECK (ease_observation_capture BETWEEN 1 AND 5),
+    ease_image_capture INTEGER NOT NULL CHECK (ease_image_capture BETWEEN 1 AND 5),
+    clarity_explanation INTEGER NOT NULL CHECK (clarity_explanation BETWEEN 1 AND 5),
+    ease_expert_review INTEGER NOT NULL CHECK (ease_expert_review BETWEEN 1 AND 5),
+    usefulness_offline_mode INTEGER NOT NULL CHECK (usefulness_offline_mode BETWEEN 1 AND 5),
+    overall_usability INTEGER NOT NULL CHECK (overall_usability BETWEEN 1 AND 5),
+    tasks_performed TEXT,
+    feedback_text TEXT,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_stakeholder_participant_type ON stakeholder_feedbacks(participant_type);

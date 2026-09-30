@@ -281,12 +281,12 @@ export const ExpertDashboard: React.FC = () => {
           </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 pt-2">
-            {Object.entries(errorAnalysis.category_breakdown || {}).map(([cat, count]) => (
+            {Object.entries((errorAnalysis.category_breakdown || errorAnalysis.systematic_error_categories || {}) as Record<string, number>).map(([cat, count]) => (
               <div key={cat} className="p-3 bg-slate-50 rounded-xl border border-slate-200">
                 <span className="text-[10px] font-bold text-slate-500 uppercase block truncate" title={cat}>
                   {cat.replace(/_/g, ' ')}
                 </span>
-                <span className="text-xl font-black text-slate-900 block mt-0.5">{count}</span>
+                <span className="text-xl font-black text-slate-900 block mt-0.5">{String(count)}</span>
               </div>
             ))}
           </div>

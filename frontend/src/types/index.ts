@@ -1,6 +1,13 @@
 export type Role = 'FARMER' | 'EXPERT' | 'ADMIN';
 
-export type RiskLevel = 'LOW' | 'MEDIUM' | 'HIGH' | 'UNKNOWN';
+export type RiskLevel = 'LOW' | 'MEDIUM' | 'HIGH' | 'REVIEW_REQUIRED' | 'UNKNOWN';
+
+export type ComparisonCategory =
+  | 'AGREEMENT'
+  | 'EXPERT_MODIFIED'
+  | 'LOW_CONFIDENCE'
+  | 'INSUFFICIENT_INFORMATION'
+  | 'IMAGE_QUALITY_ISSUE';
 
 export interface User {
   id: string;
@@ -72,15 +79,22 @@ export type SyncStatus = 'PENDING' | 'SYNCING' | 'SYNCED' | 'FAILED' | 'RETRYING
 export type ExpertDecision = 'VALIDATED' | 'MODIFIED' | 'REQUIRES_MORE_INFORMATION' | 'NOT_ACTIONABLE';
 
 export type ErrorCategory =
+  | 'POOR_IMAGE_QUALITY'
   | 'IMAGE_QUALITY'
+  | 'MISSING_SYMPTOMS'
   | 'SYMPTOM_MISSING'
+  | 'INCORRECT_SYMPTOM_INFO'
   | 'SYMPTOM_AMBIGUITY'
-  | 'LOCATION_MISSING'
+  | 'ANIMAL_STAGE_MISSING'
   | 'STAGE_MISSING'
+  | 'LOCATION_MISSING'
+  | 'LOW_CONFIDENCE'
   | 'RISK_OVER_ESTIMATION'
   | 'RISK_UNDER_ESTIMATION'
-  | 'SYNC_FAILURE'
+  | 'MODEL_EXPERT_DISAGREEMENT'
   | 'EXPERT_MODIFICATION'
+  | 'NETWORK_SYNC_FAILURE'
+  | 'SYNC_FAILURE'
   | 'OTHER';
 
 export interface ImageRecord {
@@ -120,6 +134,7 @@ export interface ExpertReview {
   modified_risk_level?: string;
   comments?: string;
   expert_notes?: string;
+  comparison_category?: ComparisonCategory;
   error_category?: ErrorCategory;
   reviewed_at?: string;
 }
@@ -195,25 +210,117 @@ export interface ObservationCreateInput {
 export interface ReviewTimeMetrics {
   metric_name: string;
   formula: string;
-  baseline_value: string;
-  target_value: string;
-  measured_value_hours: number | null;
-  average_turnaround_hours: number | null;
-  sample_size: number;
-  measurement_period: string;
-  unit: string;
-  note: string;
+  average_time_hours?: number | null;
+  measured_value_hours?: number | null;
+  average_turnaround_hours?: number | null;
+  sample_size?: number;
+  median_time_hours?: number | null;
+  min_time_hours?: number | null;
+  max_time_hours?: number | null;
+  number_of_completed_reviews?: number;
+  number_of_pending_reviews?: number;
+  unit?: string;
+  disclaimer?: string;
+  baseline_value?: string;
+  target_value?: string;
+  measurement_period?: string;
+  note?: string;
 }
 
 export interface ErrorAnalysisMetrics {
-  total_expert_reviews: number;
-  system_expert_agreement_count: number;
-  system_expert_disagreement_count: number;
-  disagreement_rate_percent: number;
-  expert_modifications_count: number;
-  requires_more_info_count: number;
-  category_breakdown: Record<string, number>;
-  evaluation_disclaimer: string;
+  total_cases?: number;
+  total_expert_reviews?: number;
+  correct_agreement_cases?: number;
+  modified_cases?: number;
+  low_confidence_cases?: number;
+  image_quality_errors?: number;
+  missing_information_cases?: number;
+  disagreement_rate_percent?: number;
+  systematic_error_categories?: Record<string, number>;
+  category_breakdown?: Record<string, number>;
+  comparison_categories_summary?: Record<string, number>;
+  system_expert_agreement_count?: number;
+  system_expert_disagreement_count?: number;
+  expert_modifications_count?: number;
+  requires_more_info_count?: number;
+  evaluation_disclaimer?: string;
+}
+
+export interface ExperimentAnalytics {
+  metric_name: string;
+  baseline: {
+    name: string;
+    sample_size: number;
+    average_review_time_hours: number | null;
+    median_review_time_hours: number | null;
+    min_hours: number | null;
+    max_hours: number | null;
+    source_status: string;
+  };
+  proposed: {
+    name: string;
+    sample_size: number;
+    average_review_time_hours: number | null;
+    median_review_time_hours: number | null;
+    min_hours: number | null;
+    max_hours: number | null;
+    completed_reviews: number;
+    pending_reviews: number;
+    source_status: string;
+  };
+  improvement: {
+    hours_saved: number | null;
+    percentage_reduction: number | null;
+    status: string;
+  };
+  disclaimer: string;
+}
+
+export interface ExperimentMeasurement {
+  id: string;
+  trial_type: 'BASELINE' | 'PROPOSED';
+  case_id?: string;
+  species?: string;
+  first_symptom_at?: string;
+  expert_review_at?: string;
+  time_to_review_hours: number;
+  notes?: string;
+  source: string;
+  created_at: string;
+}
+
+export interface StakeholderFeedback {
+  id: string;
+  participant_type: 'FARMER' | 'FARM_STAFF' | 'EXPERT';
+  ease_observation_capture: number;
+  ease_image_capture: number;
+  clarity_explanation: number;
+  ease_expert_review: number;
+  usefulness_offline_mode: number;
+  overall_usability: number;
+  tasks_performed?: string;
+  feedback_text?: string;
+  created_at: string;
+}
+
+export interface StakeholderValidationSummary {
+  validation_status: string;
+  participant_count: number;
+  average_ratings: {
+    ease_observation_capture: number | null;
+    ease_image_capture: number | null;
+    clarity_explanation: number | null;
+    ease_expert_review: number | null;
+    usefulness_offline_mode: number | null;
+    overall_usability: number | null;
+  };
+  participant_breakdown: Record<string, number>;
+  recent_feedback: {
+    participant_type: string;
+    overall_usability: number;
+    feedback_text: string;
+  }[];
+  note: string;
 }
 
 export interface MetricsDashboardData {
@@ -230,21 +337,5 @@ export interface MetricsDashboardData {
     good: number;
     acceptable: number;
     poor: number;
-  };
-  experiment_framework: {
-    baseline: {
-      name: string;
-      time_to_review: string;
-      completion_rate: string;
-    };
-    target: {
-      name: string;
-      time_to_review: string;
-      completion_rate: string;
-    };
-    measured: {
-      time_to_review: string;
-      sample_size: number;
-    };
   };
 }

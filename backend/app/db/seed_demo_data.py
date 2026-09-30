@@ -30,8 +30,11 @@ from app.core.security import get_password_hash
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+from app.db.init_db import run_migrations
+
 def seed_demo_data():
     Base.metadata.create_all(bind=engine)
+    run_migrations()
     db = SessionLocal()
     try:
         logger.info("Initializing demo accounts...")
@@ -192,29 +195,58 @@ def seed_demo_data():
         db.flush()
         db.add(ObservationSymptom(observation_id=obs4.id, symptom_id=symptom_map["Reduced appetite"].id, symptom_name="Reduced appetite", severity="Moderate"))
 
-        # SCENARIO 5: Synced observation (Sync status SYNCED)
+        # SCENARIO 5: Poor-image observation (Image quality POOR, warning triggered)
         obs5 = Observation(
             client_observation_id=str(uuid.uuid4()),
             recorded_by=farmer.id,
-            animal_id=goat1.id,
-            first_symptom_at=now - timedelta(days=1),
-            observed_at=now - timedelta(hours=8),
-            submitted_at=now - timedelta(hours=3),
+            animal_id=sheep1.id,
+            first_symptom_at=now - timedelta(hours=10),
+            observed_at=now - timedelta(hours=5),
+            submitted_at=now - timedelta(hours=5),
             appetite_status="Normal",
             activity_status="Normal",
-            farm_location=goat1.farm_location,
-            age_stage=goat1.age_stage,
-            risk_level="LOW",
-            system_confidence=0.82,
-            explanation_factors=["Single mild skin abrasion", "No systemic symptoms reported"],
-            recommended_action="Clean abrasion with antiseptic and apply fly repellent.",
-            notes="[DEMO DATA - Scenario 5: Successfully Synced] Created offline, synced automatically once connected to Wi-Fi."
+            farm_location=sheep1.farm_location,
+            age_stage=sheep1.age_stage,
+            risk_level="MEDIUM",
+            system_confidence=0.55,
+            explanation_factors=["Skin lesions suspected but image clarity low", "Quality warning generated"],
+            recommended_action="Capture a clearer, well-lit photo of the affected skin area.",
+            notes="[DEMO DATA - Scenario 5: Poor-Quality Image] Captured at dusk; image blurred and underexposed."
         )
         db.add(obs5)
         db.flush()
-        db.add(ObservationSymptom(observation_id=obs5.id, symptom_id=symptom_map["Skin changes"].id, symptom_name="Skin changes", severity="Mild"))
+        db.add(Image(
+            observation_id=obs5.id,
+            storage_path="uploads/demo_blur_sheep.jpg",
+            image_quality="POOR",
+            quality_notes="Photo quality may be too low for reliable review (low contrast, blur detected)."
+        ))
 
-        # SCENARIO 6: Expert-reviewed observation (VALIDATED decision, timestamp metrics captured)
+        # SCENARIO 6: Low-confidence prediction case (Low-confidence safety rule triggered)
+        obs_low_conf = Observation(
+            client_observation_id=str(uuid.uuid4()),
+            recorded_by=farmer.id,
+            animal_id=cow1.id,
+            first_symptom_at=now - timedelta(hours=14),
+            observed_at=now - timedelta(hours=4),
+            submitted_at=now - timedelta(hours=4),
+            appetite_status="Normal",
+            activity_status="Normal",
+            farm_location=cow1.farm_location,
+            age_stage=cow1.age_stage,
+            risk_level="REVIEW_REQUIRED",
+            system_confidence=0.52,
+            explanation_factors=[
+                "Model confidence (52%) is below safety threshold (60%)",
+                "Ambiguous visual coat texture pattern detected",
+                "Automated conclusion deferred to prevent false reassurance"
+            ],
+            recommended_action="Send this observation for expert review because system confidence is low.",
+            notes="[DEMO DATA - Scenario 6: Low-Confidence Safety Intercept] Automated triage avoided strong conclusion due to low model confidence."
+        )
+        db.add(obs_low_conf)
+
+        # SCENARIO 7: Expert-reviewed observation (VALIDATED decision, timestamp metrics captured)
         fs_time = now - timedelta(hours=36)
         obs_time = now - timedelta(hours=30)
         sub_time = now - timedelta(hours=28)
@@ -238,7 +270,7 @@ def seed_demo_data():
             system_confidence=0.86,
             explanation_factors=["Severe breathing distress", "Fever and lethargy confirmed by expert"],
             recommended_action="Veterinary field intervention dispatched.",
-            notes="[DEMO DATA - Scenario 6: Expert Reviewed & Validated] High risk case promptly examined by Dr. Amina Patel."
+            notes="[DEMO DATA - Scenario 7: Expert Reviewed & Validated] High risk case promptly examined by Dr. Amina Patel."
         )
         db.add(obs6)
         db.flush()
@@ -252,41 +284,15 @@ def seed_demo_data():
             validation_status="VALIDATED",
             expert_decision="VALIDATED",
             system_risk_level="HIGH",
-            system_confidence="0.86",
+            system_confidence="86%",
             modified_risk_level=None,
+            comparison_category="AGREEMENT",
             comments="High risk case promptly examined and validated.",
             expert_notes="[DEMO DATA] Symptoms indicate acute bovine respiratory disease. Direct inspection arranged within 2 hours.",
             error_category=None,
             reviewed_at=rev_comp
         )
         db.add(rev6)
-
-        # SCENARIO 7: Poor-image observation (Image quality POOR, warning triggered)
-        obs7 = Observation(
-            client_observation_id=str(uuid.uuid4()),
-            recorded_by=farmer.id,
-            animal_id=sheep1.id,
-            first_symptom_at=now - timedelta(hours=10),
-            observed_at=now - timedelta(hours=5),
-            submitted_at=now - timedelta(hours=5),
-            appetite_status="Normal",
-            activity_status="Normal",
-            farm_location=sheep1.farm_location,
-            age_stage=sheep1.age_stage,
-            risk_level="MEDIUM",
-            system_confidence=0.55,
-            explanation_factors=["Skin lesions suspected but image clarity low", "Quality warning generated"],
-            recommended_action="Capture a clearer, well-lit photo of the affected skin area.",
-            notes="[DEMO DATA - Scenario 7: Poor-Quality Image] Captured at dusk; image blurred and underexposed."
-        )
-        db.add(obs7)
-        db.flush()
-        db.add(Image(
-            observation_id=obs7.id,
-            storage_path="uploads/demo_blur_sheep.jpg",
-            image_quality="POOR",
-            quality_notes="Photo quality may be too low for reliable review (low contrast, blur detected)."
-        ))
 
         # SCENARIO 8: Requires-more-information observation (Expert decision REQUIRES_MORE_INFORMATION)
         obs8 = Observation(
@@ -319,14 +325,64 @@ def seed_demo_data():
             validation_status="PENDING",
             expert_decision="REQUIRES_MORE_INFORMATION",
             system_risk_level="MEDIUM",
-            system_confidence="0.65",
+            system_confidence="65%",
             modified_risk_level=None,
+            comparison_category="INSUFFICIENT_INFORMATION",
             comments="Requested rectal temperature reading and mucous membrane imagery.",
             expert_notes="[DEMO DATA] The current observations are ambiguous. Please provide temperature reading and re-check feeding behaviour.",
             error_category="SYMPTOM_AMBIGUITY",
             reviewed_at=now - timedelta(hours=7, minutes=50)
         )
         db.add(rev8)
+
+        # Seed Labeled Demo Experiment Measurements for Before/After Demonstration
+        from app.models.experiment import ExperimentMeasurement, StakeholderFeedback
+        db.query(ExperimentMeasurement).filter(ExperimentMeasurement.source == "DEMO").delete(synchronize_session=False)
+        db.query(StakeholderFeedback).filter(StakeholderFeedback.tasks_performed.like("[DEMO%")).delete(synchronize_session=False)
+
+        demo_measurements = [
+            # Baseline manual workflow measurements (typically 36 to 62 hours)
+            ExperimentMeasurement(trial_type="BASELINE", case_id="BASE-01", species="Cattle", time_to_review_hours=44.5, notes="[DEMO DATA] Baseline manual report via weekly paper ledger", source="DEMO"),
+            ExperimentMeasurement(trial_type="BASELINE", case_id="BASE-02", species="Goat", time_to_review_hours=52.0, notes="[DEMO DATA] Delayed notification; verbal message to extension officer", source="DEMO"),
+            ExperimentMeasurement(trial_type="BASELINE", case_id="BASE-03", species="Sheep", time_to_review_hours=38.0, notes="[DEMO DATA] Farmer travelled to veterinary dispensary on market day", source="DEMO"),
+            ExperimentMeasurement(trial_type="BASELINE", case_id="BASE-04", species="Cattle", time_to_review_hours=60.0, notes="[DEMO DATA] Weekend delay before extension officer visit", source="DEMO"),
+            ExperimentMeasurement(trial_type="BASELINE", case_id="BASE-05", species="Buffalo", time_to_review_hours=48.5, notes="[DEMO DATA] Handwritten case note submitted to county clerk", source="DEMO"),
+
+            # Proposed digital workflow measurements (typically 4 to 12 hours)
+            ExperimentMeasurement(trial_type="PROPOSED", case_id="PROP-01", species="Cattle", time_to_review_hours=6.5, notes="[DEMO DATA] Instant digital photo upload with high-risk escalation", source="DEMO"),
+            ExperimentMeasurement(trial_type="PROPOSED", case_id="PROP-02", species="Goat", time_to_review_hours=8.2, notes="[DEMO DATA] Offline capture synced automatically within 2 hours", source="DEMO"),
+            ExperimentMeasurement(trial_type="PROPOSED", case_id="PROP-03", species="Sheep", time_to_review_hours=5.0, notes="[DEMO DATA] Triage alert reviewed on veterinarian mobile dashboard", source="DEMO"),
+            ExperimentMeasurement(trial_type="PROPOSED", case_id="PROP-04", species="Cattle", time_to_review_hours=7.5, notes="[DEMO DATA] Structured symptom wizard captured acute signs", source="DEMO"),
+            ExperimentMeasurement(trial_type="PROPOSED", case_id="PROP-05", species="Buffalo", time_to_review_hours=6.0, notes="[DEMO DATA] Emergency isolation advice given within 6 hours", source="DEMO"),
+        ]
+        db.add_all(demo_measurements)
+
+        # Seed Labeled Demo Stakeholder Feedback
+        demo_feedbacks = [
+            StakeholderFeedback(
+                participant_type="FARMER",
+                ease_observation_capture=5,
+                ease_image_capture=4,
+                clarity_explanation=5,
+                ease_expert_review=4,
+                usefulness_offline_mode=5,
+                overall_usability=5,
+                tasks_performed="[DEMO TASK] Recorded cow cough in pasture without network, synced at homestead.",
+                feedback_text="[DEMO FEEDBACK] The offline mode is essential for us because our grazing hill has zero network. The explanation of why to isolate was very clear."
+            ),
+            StakeholderFeedback(
+                participant_type="EXPERT",
+                ease_observation_capture=4,
+                ease_image_capture=4,
+                clarity_explanation=4,
+                ease_expert_review=5,
+                usefulness_offline_mode=4,
+                overall_usability=5,
+                tasks_performed="[DEMO TASK] Validated 4 escalations and modified 1 diagnosis with guidance notes.",
+                feedback_text="[DEMO FEEDBACK] Having the photos pre-compressed with timestamps and vital trends saves at least 30 minutes of inquiry per case."
+            )
+        ]
+        db.add_all(demo_feedbacks)
 
         db.commit()
         logger.info("Successfully seeded all 8 realistic demo scenarios!")

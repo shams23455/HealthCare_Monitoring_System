@@ -282,3 +282,36 @@ export async function getErrorAnalysisMetrics(): Promise<ErrorAnalysisMetrics> {
 export async function getMetricsDashboard(): Promise<MetricsDashboardData> {
   return apiFetch<MetricsDashboardData>('/metrics/dashboard');
 }
+
+export async function getExperimentAnalytics(): Promise<any> {
+  return apiFetch<any>('/metrics/experiment/analytics');
+}
+
+export async function getExperimentMeasurements(): Promise<any[]> {
+  return apiFetch<any[]>('/metrics/experiment/measurements');
+}
+
+export async function recordExperimentMeasurement(payload: any): Promise<any> {
+  return apiFetch<any>('/metrics/experiment/measurements', {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  });
+}
+
+export async function importExperimentMeasurements(measurements: any[]): Promise<any> {
+  return apiFetch<any>('/metrics/experiment/import', {
+    method: 'POST',
+    body: JSON.stringify({ measurements })
+  });
+}
+
+export async function getStakeholderSummary(): Promise<any> {
+  return apiFetch<any>('/metrics/stakeholder/summary');
+}
+
+export async function submitStakeholderFeedback(payload: any): Promise<any> {
+  return apiFetch<any>('/metrics/stakeholder/feedback', {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  });
+}

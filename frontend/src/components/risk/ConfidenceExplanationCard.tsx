@@ -11,6 +11,8 @@ interface ConfidenceExplanationCardProps {
   factors?: string[];
   explanation?: string;
   recommendedAction?: string;
+  confidenceInterpretation?: string;
+  expertReviewStatus?: string;
   isPreliminary?: boolean;
 }
 
@@ -21,17 +23,22 @@ export const ConfidenceExplanationCard: React.FC<ConfidenceExplanationCardProps>
   factors = [],
   explanation,
   recommendedAction,
+  confidenceInterpretation,
+  expertReviewStatus = 'PENDING',
   isPreliminary = true
 }) => {
   // Normalize confidence to integer percentage (e.g. 78)
   const confidencePercent = Math.round(
     confidence <= 1.0 ? confidence * 100 : confidence
   );
+  const isLowConfidence = confidencePercent < 60 || level === 'REVIEW_REQUIRED';
 
   const getBorderColor = () => {
     switch (level) {
       case 'HIGH':
         return 'border-red-400 bg-red-50/60';
+      case 'REVIEW_REQUIRED':
+        return 'border-purple-400 bg-purple-50/70';
       case 'MEDIUM':
         return 'border-amber-400 bg-amber-50/60';
       case 'LOW':
@@ -45,6 +52,8 @@ export const ConfidenceExplanationCard: React.FC<ConfidenceExplanationCardProps>
     switch (level) {
       case 'HIGH':
         return 'bg-red-600';
+      case 'REVIEW_REQUIRED':
+        return 'bg-purple-600';
       case 'MEDIUM':
         return 'bg-amber-500';
       case 'LOW':
@@ -69,31 +78,47 @@ export const ConfidenceExplanationCard: React.FC<ConfidenceExplanationCardProps>
         <RiskBadge level={level} />
       </div>
 
-      {/* Confidence Bar */}
-      <div className="space-y-1.5 bg-white/80 p-3 rounded-xl border border-slate-200/60">
+      {/* Confidence Bar & Interpretation */}
+      <div className="space-y-2 bg-white/90 p-3.5 rounded-xl border border-slate-200/70">
         <div className="flex items-center justify-between text-xs font-bold text-slate-700">
           <span className="flex items-center gap-1.5">
             <Info className="w-3.5 h-3.5 text-slate-400" />
-            Preliminary Confidence
+            System Confidence Score
           </span>
           <span className="text-sm font-black text-slate-900">{confidencePercent}%</span>
         </div>
-        <div className="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
+        <div className="w-full bg-slate-200 h-2.5 rounded-full overflow-hidden">
           <div
             className={`h-full rounded-full transition-all duration-500 ${getProgressBarColor()}`}
             style={{ width: `${Math.min(100, Math.max(10, confidencePercent))}%` }}
           />
         </div>
-        <p className="text-[11px] text-slate-500 italic">
-          Calculated transparently from clinical observation rules, reported symptoms, and image clarity.
+        <p className="text-[11px] font-medium text-slate-600">
+          {confidenceInterpretation || (isLowConfidence
+            ? `Low confidence (${confidencePercent}%). Expert review recommended because system confidence is low.`
+            : `System confidence is ${confidencePercent}%. Calculated transparently from clinical observation rules and visual clarity.`
+          )}
         </p>
       </div>
+
+      {/* Low-Confidence Safety Intercept Banner (Part 7 & 8) */}
+      {isLowConfidence && (
+        <div className="bg-purple-100/90 border border-purple-300 p-3.5 rounded-xl text-purple-900 text-xs font-bold space-y-1">
+          <div className="flex items-center gap-2 text-purple-800">
+            <ShieldAlert className="w-4 h-4 text-purple-700 shrink-0" />
+            <span className="uppercase tracking-wider text-[11px] font-black">Low-Confidence Safety Intercept</span>
+          </div>
+          <p className="leading-snug">
+            Expert review recommended because system confidence is low. The system avoided a strong automated conclusion to ensure animal health safety.
+          </p>
+        </div>
+      )}
 
       {/* Why was this flagged? (Explainability in farmer-friendly language) */}
       <div className="space-y-2">
         <h4 className="text-xs font-extrabold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
           <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
-          Why this needs attention
+          Why this needs attention (Main Contributing Factors)
         </h4>
 
         {factors && factors.length > 0 ? (
@@ -126,6 +151,12 @@ export const ConfidenceExplanationCard: React.FC<ConfidenceExplanationCardProps>
           </p>
         </div>
       )}
+
+      {/* Expert Review Status */}
+      <div className="flex items-center justify-between bg-slate-100/90 px-3.5 py-2 rounded-xl text-xs font-bold text-slate-700 border border-slate-200">
+        <span>Expert Review Status:</span>
+        <span className="font-extrabold text-farm-700 uppercase tracking-wider">{expertReviewStatus}</span>
+      </div>
 
       {/* Explicit Legal / Medical Disclaimer */}
       <div className="flex items-start gap-2 pt-2 border-t border-slate-200 text-[11px] text-slate-500 leading-tight">
